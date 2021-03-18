@@ -39,5 +39,31 @@
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
+    <script type="text/javascript" src="https://beikecdn.xdf.cn/seal/wechat-mini/common/mathjax/2.7.5/MathJax.js?config=TeX-AMS_SVG-full"></script>
+    <script>
+      window.MathJax.Hub.Config({
+        showMathMenu: false,
+        messageStyle: 'none',
+        tex2jax: {
+          inlineMath: [['\\(', '\\)'], ['$', '$']],
+          displayMath: [['\\[', '\\]'], ['$$', '$$']],
+          processEscapes: true
+        },
+        MathML: {
+          extensions: ['content-mathml.js']
+        },
+    
+        TeX: {
+          equationNumbers: { autoNumber: ['AMS'], useLabelIds: true },
+          extensions: ['mhchem.js']
+        },
+        SVG: { linebreaks: { automatic: true }, scale: 85, minScaleAdjust: 40 },
+        CommonHTML: {
+          linebreaks: { automatic: true },
+          scale: 85,
+          minScaleAdjust: 40
+        }
+      })
+    </script>
   </body>
 </html>
