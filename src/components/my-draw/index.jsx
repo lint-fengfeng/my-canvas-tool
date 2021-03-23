@@ -1,5 +1,4 @@
 import React, { Component, useEffect, useState, useRef } from 'react'
-
 // 引入画笔橡皮
 import { Earaser, Pen, Subline, unit } from '../../utils'
 // img
@@ -14,7 +13,16 @@ class MyDraw extends Component {
     this.state = {
       text: '已知$R$上奇函数$f(x)$的图象关于直线$x=1$对称，$x∈[0,1]$时，$f\left(x\right)= \dfrac{1}{2}x $．当$x∈[2k-1,2k+1]$时，求$f(x)$的解析式.二次函数$y=ax^{2}+bx+c(a\ne 0)$的图象如图所示，有下列结论：①$abc&gt;0$；②$a+b+c=2$；③$a&gt;\dfrac{1}{2}$；④$b&gt;1$，其中正确的结论个数是$(\qquad)$<br /><img alt="" height="148" src="http://sealdata.youneng.com/img/26985db1bdf6c5545c8f1acdc5176fa1.png" width="157" /><br /><br />'
     }
+    this.canvas_up = null
+    this.canvas_down = null 
+    this.canvas_image = null
+
     this.ctx_up = null
+    this.ctx_down = null
+    this.ctx_image = null
+    
+    // 没有辅助线的草稿本的点阵
+    this.saveCanvasWithoutSubline = null
   }
 
   static propTypes = {};
@@ -24,9 +32,9 @@ class MyDraw extends Component {
     this.initCtx()
     this.earaser = new Earaser(this.canvas_up, this.ctx_up)
     this.pen = new Pen(this.canvas_up, this.ctx_up)
+    // 此处非常注意 辅助线在单独一层canvas
     this.subline = new Subline(this.canvas_down, this.ctx_down)
     document.body.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false })
-    this.renderMathJax()
   }
 
   initCtx = () => {
@@ -42,7 +50,6 @@ class MyDraw extends Component {
     this.ctx_up.fillStyle = "#ADA6A0"
     // this.ctx_up.fillStyle = "rgba(0,0,0,.5)"
     this.ctx_up.fillRect(0,0, width, height)
-
 
     // 图片沉底
     const img = new Image(); img.src = BackImage 
@@ -61,7 +68,7 @@ class MyDraw extends Component {
       //   // }
       // }
       // _this.ctx_image.putImageData(pixelList, 0, 0)
-      // _this.pickImageUp()
+      // _this.pickUp(this.canvas_image)
       // _this.ctx_image.clearRect(0, 0, width, height)
       // const end = new Date().getTime()
       // console.log("转化消耗", end - start) 
@@ -71,85 +78,181 @@ class MyDraw extends Component {
   handleEaraser = () => {
     if (!this.pen.earaser) {
       this.pen.switch(false)
+      this.subline.switch(false)
       this.earaser.switch(true)
     }
   }
 
   handlePen = () => {
-    if (!this.pen.open) {
-      this.pen.switch(true)
+    if (!this.pen.isOpen) {
       this.earaser.switch(false)
+      this.subline.switch(false)
+      this.pen.switch(true)
     }
   } 
 
   handleSubLine = (x, y) => {
     this.pen.switch(false) // 关闭画笔
     this.earaser.switch(false) // 关闭橡皮
-    this.subline.add()
-    this.pickUp()
+    // 如果已经有辅助线了  需要先回退  在初次添加辅助线前 也要存上层canvas
+    if (this.subline.count > 0) {
+      this.rollbackUp()
+    }
+    // 添加辅助线之前 存没有辅助线的样子
+    this.saveUp()
+    // 打开辅助线开关  并添加
+    this.subline.switch(true).add()
+    // 托起
+    this.pickUp(this.canvas_down)
   }
 
+  //辅助线的status 0-未选中 1-选中 2-延长 3-拖拽 4-删除 
   brushStart = (e) => {
-    if (this.pen.open)  {
+    if (this.pen.isOpen)  { // 当前使用画笔
       console.log(e.touches[0].clientX, e.touches[0].clientY, "手指触摸")
       this.pen.fingerDown(e.touches[0].clientX, e.touches[0].clientY)
+    }
+
+    const { status, isOpen } = this.subline
+    if (isOpen) {
+      // 返回延长的点的key 如果没有延长返回null
+      this.isExtend = this.subline.isExtend(e.touches[0].clientX, e.touches[0].clientY)
+      this.isDrag = this.subline.isDrag(e.touches[0].clientX, e.touches[0].clientY)
+      if (this.isExtend && status === 1) { // 延伸
+        // 存储拖拽的是p1 还是p2
+        this.extendKey = this.isExtend
+        this.subline.switchStatus('status', 2)
+      } else if (this.isDrag && status === 1) { // 拖拽
+        this.subline.switchStatus('status', 3)
+        // 记录拖拽 其实落点
+        this.startDragPosition = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      } else if (status <= 1) { // 选中
+        // 如果没有被选中 走判断选中逻辑
+        this.subline.choose(e.touches[0].clientX, e.touches[0].clientY).then(() => {
+          this.rollbackUp()
+          // 选中完了 托起
+          this.pickUp(this.canvas_down)
+        })
+      }
+    }
+    // 用橡皮、笔的时候; 辅助线下移, 回退到没有辅助线的样子 
+    // 再走后续的move 去画
+    if (this.pen.isOpen || this.earaser.isOpen) {
+      this.rollbackUp()
     }
   }
 
   brushMove = (e) => {
-    console.log(e.touches[0].clientX, e.touches[0].clientY, "手指触摸")
+    const { clientX, clientY } = e.touches[0]
+    // console.log(clientX, clientY, "手指触摸")
     // e.preventDefault()
-    if (this.pen.open) {
-      this.pen.fingerMove(e.touches[0].clientX, e.touches[0].clientY)
-    } else if (this.earaser.open) {
-      this.earaser.earasing(e.touches[0].clientX, e.touches[0].clientY)
+    if (this.pen.isOpen) { // 画笔
+      this.pen.fingerMove(clientX, clientY)
+    } else if (this.earaser.isOpen) { // 橡皮
+      this.earaser.earasing(clientX, clientY)
+    }
+
+    const { status, isOpen } = this.subline
+    if (isOpen) {
+      switch(status) {
+        case 2: { // 辅助线 延长两侧
+          // 每一次延长挪动  都要重新回退到画布什么都没有的样子
+          this.rollbackUp()
+          this.subline.extendTo(this.extendKey, clientX, clientY)
+          this.pickUp(this.canvas_down)
+          break
+        }
+        case 3: { // 辅助线 拖拽
+          const obj = {
+            x: clientX - this.startDragPosition.x,
+            y: clientY - this.startDragPosition.y
+          }
+          this.rollbackUp()
+          this.subline.drag(obj.x, obj.y)
+          this.pickUp(this.canvas_down)
+          this.startDragPosition = { x: clientX, y: clientY }
+          break
+        } 
+        case 4: { // 辅助线 删除
+          break
+        }
+      }
     }
   }
 
-  // 峰哥起的名字：托起
-  pickSublineUp = () => {
+  brushEnd = (e) => {
+    // 画笔、橡皮的时候 画完先存好 
+    if (this.pen.isOpen || this.earaser.isOpen) {
+      this.saveUp()
+    }
+
+    if (this.subline.isOpen && this.subline.status === 2) {
+      this.subline.switchStatus('status', 1)
+    }
+
+    if (this.subline.isOpen && this.subline.status === 3) {
+      this.subline.switchStatus('status', 1)
+    }
+
+    // 再 托起
+    this.pickUp(this.canvas_down)
+  }
+
+  // 只要上层canvas发生了变化
+  // 都要进行存储，不存辅助线
+  // 因此变化前都要线回退
+  // 存完的值便于 下一次变化的时候回退
+  saveUp = () => {
+    const { width, height } = this.props
+    this.saveCanvasWithoutSubline = this.ctx_up.getImageData(0, 0, width, height )
+    // }
+  }
+
+  // 只要辅助线有样式上的变化 
+  // 包括取消选中
+  // 新增的辅助线是选中的
+  // 都要对上层canvas进行回退
+  rollbackUp = () => {
+    if (this.saveCanvasWithoutSubline) {
+      this.ctx_up.putImageData(this.saveCanvasWithoutSubline, 0, 0)
+    }
+  }
+
+  // 雪峰起的名字：托起 (不知道好不好，暂时先这么叫)
+  pickUp = (canvas) => {
     // 将离屏辅助线的canvas画到上层来 
-    this.canvas_down.style.display = 'block'
-    this.ctx_up.drawImage(this.canvas_down, 0, 0, this.props.width, this.props.height)
-    this.canvas_down.style.display = 'none'
+    canvas.style.display = 'block'
+    this.ctx_up.drawImage(canvas, 0, 0, this.props.width, this.props.height)
+    // canvas.style.display = 'none'
   }
 
-  pickImageUp = () => {
-    this.canvas_image.style.display = 'block'
-    this.ctx_up.drawImage(this.canvas_image, 0, 0, this.props.width, this.props.height)
-    this.canvas_image.style.display = 'none'
+  // 有些场景为了 上层回退回没有选中样式的时候， 下层还在选中状态
+  // 所以需要隐藏下层的canvas
+  hideDown() {
+    this.canvas_down.style.display = "none"
   }
-
-  renderMathJax = () => {
-    window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub], () => {})
-  }
-  // rotateSubLine = () => {
-  //   this.ctx_up.save();
-  //   this.ctx_up.translate(150, 85)
-  //   this.ctx_up.rotate(-30 * Math.PI/ 180)
-
-  //   this.ctx_up.beginPath()
-  //   this.ctx_up.moveTo(20, 20)
-  //   const endX = 200
-  //   const endY = 20
-  //   this.ctx_up.lineTo(endX, endY)
-  //   this.ctx_up.stroke()
-  //   this.ctx_up.closePath()
-  //   this.ctx_up.restore()
-  // }
-
 
   render() {
     const { width, height } = this.props
     return (<>
       <button onClick={this.handleEaraser}>橡皮</button>
       <button onClick={this.handlePen}>画笔</button>
-      <button onClick={this.addSubLine}>辅助线</button>
+      <button onClick={this.handleSubLine}>辅助线</button>
       {/* <button onClick={this.rotateSubLine}>旋转</button> */}
       <div>
-        <div className="text" dangerouslySetInnerHTML={{__html: this.state.text}}></div>
-        <canvas width={width} height={height}  id="canvas_down">你的手机浏览器不支持canvas,请升级浏览器~</canvas>
-        <canvas width={width} height={height} onTouchMove={this.brushMove} onTouchStart={this.brushStart} id="canvas_up">你的手机浏览器不支持canvas,请升级浏览器~</canvas>
+        <canvas width={width} height={height}
+          onTouchStart={this.brushStart}
+          onTouchMove={this.brushMove}
+          onTouchEnd={this.brushEnd} id="canvas_up"
+        >你的手机浏览器不支持canvas,请升级浏览器~</canvas>
+
+        <canvas width={width} height={height}
+          // onTouchStart={this.brushStartDown}
+          // onTouchMove={this.brushMoveDown}
+          // onTouchEnd={this.brushEndDown}
+          id="canvas_down"
+        >你的手机浏览器不支持canvas,请升级浏览器~</canvas>
+
         <canvas width={width} height={height} id="canvas_image">你的手机浏览器不支持canvas,请升级浏览器~</canvas>
         {/* <canvas width={width} height={height} id="canvas_bg">你的手机浏览器不支持canvas,请升级浏览器~</canvas> */}
       </div>
