@@ -1,10 +1,130 @@
 .App {
   text-align: center;
 }
-.box {
-  width: 100%;
-  height: 100%;
+/* 前端环形进度条 */
+.app .box {
+  width: 200px;
+  height: 200px;
+  margin: 200px auto;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 10px red inset;
+  display: flex;
 }
+
+.box .inner1, .box .inner2 {
+  flex: 1;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  height: 180px;
+  background: #fff;
+  border: 10px solid;
+}
+
+.box .inner1 {
+  border-radius: 100px 0 0 100px;
+  border-color: grey transparent grey grey;
+  transform-origin: 100% 50%;
+  z-index: 1;
+  animation: left-pan 3s infinite;
+}
+
+.box .inner2 {
+  border-radius: 0 100px 100px 0;
+  border-color: grey grey grey transparent;
+  transform-origin: 0% 50%;
+  z-index: 2;
+  animation: right-pan 3s infinite;
+}
+
+@keyframes left-pan {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(0deg);
+  }
+
+  50% {
+    transform: rotate(0deg);
+  }
+
+  75% {
+    display: none;
+    transform: rotate(90deg);
+  }
+
+  100% {
+    display: none;
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes right-pan {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(90deg);
+  }
+
+  50% {
+    transform: rotate(180deg);
+  }
+
+  75% {
+    transform: rotate(270deg);
+    border-color: red grey gray transparent;
+  }
+
+  100% {
+    transform: rotate(360deg);
+    border-color: red red gray transparent;
+  }
+}
+/* svg */
+/* .face {
+  color: #fff;
+} */
+.title {
+  font-size: 46px;
+  text-align: center;
+}
+
+#clock {
+  display: block;
+  margin: 100px auto;
+  stroke: black;
+  fill: #fff;
+  stroke-linecap: round;
+}
+
+#clock .number {
+  font-family: sans-serif;
+  font-size: 8px;
+  font-weight: normal;
+  text-anchor: middle;
+  fill: black;
+  stroke: none;
+}
+
+#clock .hour {
+  font-weight: bold;
+  stroke-width: 2;
+}
+
+#clock .minute {
+  stroke-width: 1;
+}
+
+#clock .second {
+  stroke-width: .5;
+}
+
+
 .cropper {
   position: relative;
   top: 48px;
@@ -12,8 +132,7 @@
   right: 0;
   bottom: 0;
   background: rgba(141,141,141,0.6);
-  text-align:center;
- 
+  text-align: center;
 }
 
 .App-logo {

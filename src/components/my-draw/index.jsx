@@ -3,6 +3,7 @@ import React, { Component, useEffect, useState, useRef } from 'react'
 import { Earaser, Pen, Subline, unit } from '../../utils'
 // img
 import BackImage from '../../image/background.jpg'
+import { Toast } from 'xdf-mini-lib-test'
 import "./index.scss"
 
 
@@ -29,6 +30,7 @@ class MyDraw extends Component {
   static defaultProps = {};
 
   componentDidMount() {
+    Toast.info({text: '哈哈哈'})
     this.initCtx()
     this.earaser = new Earaser(this.canvas_up, this.ctx_up)
     this.pen = new Pen(this.canvas_up, this.ctx_up)
